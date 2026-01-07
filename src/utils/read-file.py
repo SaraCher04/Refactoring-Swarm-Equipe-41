@@ -3,7 +3,7 @@
 # =========================================================
 
 from pathlib import Path
-from src.validate_sandbox_path.py import validate_sandbox_path.py
+from src.validate_sandbox_path.py import validate_sandbox_path
 
 def read_file(file_path: str) -> str:
     """
