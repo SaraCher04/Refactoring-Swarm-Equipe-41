@@ -1,7 +1,7 @@
 # =========================================================
 # write-file(file-path : str, content: str, mode: str = "w") -> None:
 # =========================================================
-from toolsmith import validate_sandbox_path
+from src.validate_sandbox_path.py import validate_sandbox_path
 
 def write_file(file_path: str, content: str, mode: str = "w") -> None:
     """
