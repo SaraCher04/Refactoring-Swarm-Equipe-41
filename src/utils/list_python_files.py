@@ -2,7 +2,7 @@
 # list_python_files(target_dir: str) -> list[str]
 # =========================================================
 from pathlib import Path
-from toolsmith import validate_sandbox_path  # réutilise la fonction sécurité
+from src import validate_sandbox_path  # réutilise la fonction sécurité
 
 def list_python_files(target_dir: str) -> list[str]:
     """
