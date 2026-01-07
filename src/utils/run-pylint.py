@@ -3,7 +3,7 @@
 # =========================================================
 import subprocess
 import sys
-from toolsmith import list_python_files
+from src.list_python_files.py import list_python_files
 
 def run_pylint(target_dir: str) -> dict:
     py_files = list_python_files(target_dir)
