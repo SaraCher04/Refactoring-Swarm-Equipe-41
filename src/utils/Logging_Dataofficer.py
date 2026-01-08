@@ -38,7 +38,7 @@ def log_agent_action(
     details: Dict[str, Any],
     input_prompt: str,
     output_response: str,
-    model_used: str = "gemini-1.5-flash",  # ✅ Valeur par défaut réaliste
+    model_used: str = "gemini-1.5-flash",  
     status: str = "SUCCESS",
 ) -> None:
     """
@@ -51,7 +51,7 @@ def log_agent_action(
         input_prompt    : texte exact envoyé au LLM (OBLIGATOIRE)
         output_response : réponse brute reçue du LLM (OBLIGATOIRE)
         model_used      : modèle LLM utilisé (ex: "gemini-1.5-flash")
-        status          : "SUCCESS" ou "FAILURE"  # ✅ Correction orthographe
+        status          : "SUCCESS" ou "FAILURE" 
 
     ⚠️ input_prompt et output_response doivent toujours être fournis.
     """
@@ -72,7 +72,7 @@ def log_agent_action(
     # Appel du logger du TP
     log_experiment(
         agent_name=agent,
-        model_used=model_used,  # ✅ Paramètre passé correctement
+        model_used=model_used,  
         action=action,
         details=details,
         status=status,
@@ -91,7 +91,7 @@ def finalize_experiment(status: str = "SUCCESS") -> None:
     log_experiment(
         agent_name="System",
         model_used="system",
-        action=ActionType.ANALYSIS,  # ✅ Changé de END à un type valide
+        action=ActionType.ANALYSIS,  
         details={
             "input_prompt": "Experiment finalization",
             "output_response": f"Experiment ended with status: {status}",
@@ -99,3 +99,4 @@ def finalize_experiment(status: str = "SUCCESS") -> None:
         },
         status=status,
     )
+
