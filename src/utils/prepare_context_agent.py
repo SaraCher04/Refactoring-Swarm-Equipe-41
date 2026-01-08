@@ -38,18 +38,6 @@ def prepare_context_agent(
     Returns:
         Dict avec 'system_prompt' et 'user_prompt' prêts à envoyer au LLM
 
-    Example:
-        >>> context = prepare_context_agent(
-        ...     agent_type=AgentType.AUDITOR,
-        ...     code_content=buggy_code,
-        ...     additional_context={"file_path": "messy_code.py"}
-        ... )
-        >>> # Dans votre agent:
-        >>> response = llm.generate(
-        ...     system=context['system_prompt'],
-        ...     user=context['user_prompt']
-        ... )
-        >>> # Puis logger avec log_agent_action()
     """
     if not code_content or not code_content.strip():
         raise ValueError("Le code_content ne peut pas être vide")
@@ -84,3 +72,4 @@ def prepare_context_agent(
 
 
 # ====================================================================================
+
