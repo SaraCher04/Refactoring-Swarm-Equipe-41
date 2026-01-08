@@ -4,7 +4,7 @@
 
 from pathlib import Path
 from shutil import copy2
-from src.validate_sandbox_path.py import validate_sandbox_path
+from src.validate_sandbox_path import validate_sandbox_path
 
 SANDBOX_DIR = Path("sandbox").resolve()
 
@@ -39,3 +39,4 @@ def backup_file(file_path: str) -> None:
 
     print(f"✅ Backup created: '{backup_path}' (backup #{backup_number})")
     return str(backup_path)
+
