@@ -5,7 +5,7 @@
 import sys
 import subprocess
 from src.validate_sandbox_path import validate_sandbox_path
-from src.list_python_files.py import list_python_files
+from src.list_python_files import list_python_files
 
 
 def run_pytest(tests_dir: str) -> dict:
@@ -53,3 +53,4 @@ def run_pytest(tests_dir: str) -> dict:
         result["success"] = False
 
     return result
+
