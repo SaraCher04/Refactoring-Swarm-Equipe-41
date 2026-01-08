@@ -1,7 +1,7 @@
 # =========================================================
 # apply_patch(file_path: str, new_code: str) -> None:
 # =========================================================
-from src.validate_sandbox_path.py import validate_sandbox_path
+from src.validate_sandbox_path import validate_sandbox_path
 
 
 def apply_patch(file_path: str, new_code: str) -> None:
@@ -20,3 +20,4 @@ def apply_patch(file_path: str, new_code: str) -> None:
         f.write(new_code)
 
     print(f"✅ Patch applied successfully to '{safe_path}'")
+
