@@ -87,7 +87,7 @@ def main():
     python_files = [
         f
         for f in list_python_files(target_dir)
-        if not f.endswith("_test.py")  # Skip tests générés!
+        if not f.endswith("_test.py")  # Skip tests générés
     ]
     for file_path in python_files:
         process_file(file_path, API_KEY)
