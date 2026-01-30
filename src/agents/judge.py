@@ -5,8 +5,10 @@ import sys
 import time
 import requests
 from src.utils.logger import log_experiment, ActionType
+from src.utils.tool import read_file, write_file
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
 
 def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
     """
@@ -23,21 +25,21 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
         f"{code}"
     )
 
-    payload = {
-        "contents": [{"parts": [{"text": input_prompt}]}]
-    }
+    payload = {"contents": [{"parts": [{"text": input_prompt}]}]}
 
     retries = 3
     for attempt in range(retries):
         try:
             response = requests.post(
-                f"{GEMINI_URL}?key={api_key}",
-                json=payload,
-                timeout=120
+                f"{GEMINI_URL}?key={api_key}", json=payload, timeout=120
             )
             if response.status_code == 200:
-                tests_code = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-                tests_code = tests_code.replace("```python", "").replace("```", "").strip()
+                tests_code = response.json()["candidates"][0]["content"]["parts"][0][
+                    "text"
+                ]
+                tests_code = (
+                    tests_code.replace("```python", "").replace("```", "").strip()
+                )
                 # Log successful generation
                 log_experiment(
                     agent_name="JudgeAgent",
@@ -45,9 +47,9 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
                     action=ActionType.GENERATION,
                     details={
                         "input_prompt": input_prompt,
-                        "output_response": tests_code
+                        "output_response": tests_code,
                     },
-                    status="SUCCESS"
+                    status="SUCCESS",
                 )
                 return tests_code
             else:
@@ -58,9 +60,9 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
                     action=ActionType.GENERATION,
                     details={
                         "input_prompt": input_prompt,
-                        "output_response": response.text
+                        "output_response": response.text,
                     },
-                    status="FAILURE"
+                    status="FAILURE",
                 )
         except requests.exceptions.RequestException as e:
             log_experiment(
@@ -68,7 +70,7 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
                 model_used="gemini-1.5-flash",
                 action=ActionType.DEBUG,
                 details={"input_prompt": input_prompt, "output_response": str(e)},
-                status="FAILURE"
+                status="FAILURE",
             )
             if attempt == retries - 1:
                 break
@@ -76,7 +78,10 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
 
     return ""
 
-def run_tests(code_file: str, api_key: str, module_name: str, generate_tests: bool = True) -> tuple:
+
+def run_tests(
+    code_file: str, api_key: str, module_name: str, generate_tests: bool = True
+) -> tuple:
     """
     Run pytest for the target code file. If generate_tests is True, generate tests first.
     Returns (success: bool, feedback: str) where feedback is pytest output or error message.
@@ -88,9 +93,8 @@ def run_tests(code_file: str, api_key: str, module_name: str, generate_tests: bo
     test_file_path = code_file.replace(".py", "_test.py")
 
     if generate_tests:
-        # Read code to send for test generation
-        with open(code_file, "r", encoding="utf-8") as f:
-            code = f.read()
+        # Read codeee to send for test generation
+        code = read_file(code_file)
 
         tests_code = generate_tests_for_code(code, api_key, module_name)
         if not tests_code:
@@ -100,14 +104,16 @@ def run_tests(code_file: str, api_key: str, module_name: str, generate_tests: bo
                 agent_name="JudgeAgent",
                 model_used="gemini-1.5-flash",
                 action=ActionType.DEBUG,
-                details={"input_prompt": "Generate tests for code", "output_response": feedback},
-                status="FAILURE"
+                details={
+                    "input_prompt": "Generate tests for code",
+                    "output_response": feedback,
+                },
+                status="FAILURE",
             )
             return False, feedback
 
         # Write tests to file
-        with open(test_file_path, "w", encoding="utf-8") as f:
-            f.write(tests_code)
+        write_file(test_file_path, tests_code)
 
     else:
         # If not generating tests, make sure test file exists
@@ -117,17 +123,16 @@ def run_tests(code_file: str, api_key: str, module_name: str, generate_tests: bo
                 agent_name="JudgeAgent",
                 model_used="local",
                 action=ActionType.DEBUG,
-                details={"input_prompt": "Check test file existence", "output_response": feedback},
-                status="FAILURE"
+                details={
+                    "input_prompt": "Check test file existence",
+                    "output_response": feedback,
+                },
+                status="FAILURE",
             )
             return False, feedback
 
     # Run pytest on the test file
-    result = subprocess.run(
-        ["pytest", test_file_path],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["pytest", test_file_path], capture_output=True, text=True)
 
     output = result.stdout + result.stderr
     status = "SUCCESS" if result.returncode == 0 else "FAILURE"
@@ -137,11 +142,8 @@ def run_tests(code_file: str, api_key: str, module_name: str, generate_tests: bo
         agent_name="JudgeAgent",
         model_used="local",
         action=ActionType.DEBUG,
-        details={
-            "input_prompt": "pytest execution",
-            "output_response": output
-        },
-        status=status
+        details={"input_prompt": "pytest execution", "output_response": output},
+        status=status,
     )
 
     return result.returncode == 0, output
