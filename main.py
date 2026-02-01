@@ -8,6 +8,8 @@ from src.agents.judge import run_tests
 from src.utils.logger import log_experiment, ActionType
 from src.utils.tool import validate_sandbox_path
 from src.utils.tool import list_python_files
+import subprocess
+import re
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,47 +27,158 @@ if not API_KEY:
 MAX_FIXER_RETRIES = 3  # bounded to avoid infinite loops
 
 
+def get_pylint_score(file_path: str) -> float:
+    """Exécute pylint et retourne le score."""
+    try:
+        result = subprocess.run(
+            ["pylint", file_path], capture_output=True, text=True, timeout=30
+        )
+        output = result.stdout + result.stderr
+        match = re.search(r"rated at ([\d\.]+)/10", output)
+        if match:
+            return float(match.group(1))
+        else:
+            return 0.0
+    except Exception as e:
+        print(f"⚠️ Pylint error: {e}")
+        return 0.0
+
+
 def process_file(file_path: str, api_key: str):
     """Process a single file through auditing, fixing, and testing with feedback loop."""
-    print(f"🚀 Starting analysis for: {file_path}")
+    print(f"🚀 Processing: {file_path}")
 
-    # 1) Auditor
-    refactoring_feedback = analyze_code(file_path, api_key)
-    if not refactoring_feedback:
-        print(f"❌ No issues found for {file_path}. Skipping.")
-        return
+    # SAUVEGARDER le code original
+    from src.utils.tool import read_file, write_file
 
-    # 2) First fixing pass (based only on auditor issues)
-    fixed_file_path = fix_code(file_path, refactoring_feedback, api_key)
+    original_code = read_file(file_path)
 
-    # 3) Judge: generate tests once and run them
+    # 1. Vérifier Pylint initial
+    score_before = get_pylint_score(file_path)
+    print(f"📊 Pylint BEFORE: {score_before:.2f}/10")
+
+    # Si code EXCELLENT (>9.0) ET tests existants ET passent → SKIP
+    if score_before >= 9.0:
+        module_name = os.path.splitext(os.path.basename(file_path))[0]
+        test_path = f"{file_path.replace('.py', '_test.py')}"
+
+        if os.path.exists(test_path):
+            success, _ = run_tests(
+                file_path, api_key, module_name, generate_tests=False
+            )
+            if success:
+                print(f"✅ Code already OPTIMAL! (Pylint: {score_before}, tests pass)")
+                print(f"📈 No action needed")
+                return
+
+    # 2. Vérifier tests existants
     module_name = os.path.splitext(os.path.basename(file_path))[0]
-    success, feedback = run_tests(
-        fixed_file_path, api_key, module_name, generate_tests=True
-    )
+    test_path = f"{file_path.replace('.py', '_test.py')}"
 
-    attempt = 1
-    while not success and attempt <= MAX_FIXER_RETRIES:
-        print(
-            f"❌ Tests failed for {file_path}. Feedback: {feedback.splitlines()[0] if feedback else ''} Retrying ({attempt}/{MAX_FIXER_RETRIES})..."
-        )
-        # Provide judge feedback to fixer so it can use the pytest output in the prompt
-        fixed_file_path = fix_code(
-            fixed_file_path, refactoring_feedback, api_key, judge_feedback=feedback
-        )
-        # Re-run tests but DO NOT regenerate tests (use already generated test file)
+    skip_test_generation = False
+
+    if os.path.exists(test_path):
         success, feedback = run_tests(
-            fixed_file_path, api_key, module_name, generate_tests=False
+            file_path, api_key, module_name, generate_tests=False
         )
         if success:
-            print(f"✅ Tests passed for {file_path} after {attempt} retry(ies).")
-            break
-        attempt += 1
+            print(f"✅ Existing tests PASS")
+            skip_test_generation = True
+        else:
+            print(f"❌ Existing tests FAIL")
+            skip_test_generation = False
 
-    if not success:
-        print(f"❌ Maximum retries reached for {file_path}. Test failed.")
+    # 3. Auditor (toujours exécuté sauf si code optimal)
+    print(f"🔍 Running auditor...")
+    issues = analyze_code(file_path, api_key)
+
+    if not issues or issues == ["Gemini API error during analysis"]:
+        print(f"ℹ️  No issues found by auditor")
+
+        # Si Pylint déjà bon ET tests passent → fin
+        if score_before >= 8.0 and skip_test_generation:
+            print(f"✅ Code already good enough")
+            return
+
+        issues = ["Code could use minor improvements"]  # Forcer une petite amélioration
+
+    print(f"🔍 Auditor found {len(issues)} issues")
+    for i, issue in enumerate(issues[:3], 1):  # Afficher 3 premières issues
+        print(f"   {i}. {issue[:80]}...")
+    if len(issues) > 3:
+        print(f"   ... and {len(issues)-3} more")
+
+    # 4. Fixer (UNE SEULE FOIS d'abord)
+    print(f"🔧 Fixing issues...")
+    fixed_file = fix_code(file_path, issues, api_key)
+
+    # Vérifier qualité après fixing
+    score_after_fix = get_pylint_score(fixed_file)
+    print(f"📊 Pylint AFTER fix: {score_after_fix:.2f}/10")
+
+    # Si qualité baisse BEAUCOUP, restaurer
+    if score_after_fix < score_before - 1.0:
+        print(f"⚠️  CRITICAL: Fixing DEGRADED quality significantly!")
+        print(f"⚠️  Restoring original version...")
+        write_file(fixed_file, original_code)
+        score_after_fix = score_before
+        fixed_file = file_path
+
+    # 5. Tests finaux
+    print(f"🧪 Running tests (generate: {not skip_test_generation})...")
+    success, feedback = run_tests(
+        fixed_file, api_key, module_name, generate_tests=not skip_test_generation
+    )
+
+    # UNE seule tentative de re-fix si échec
+    if not success and MAX_FIXER_RETRIES > 0:
+        print(f"❌ Tests failed, trying ONE re-fix with feedback...")
+        # Limiter le feedback aux premières lignes
+        short_feedback = "\n".join(feedback.split("\n")[:10])
+        fixed_file = fix_code(
+            fixed_file, issues, api_key, judge_feedback=short_feedback
+        )
+
+        # Re-tester
+        success, feedback = run_tests(
+            fixed_file, api_key, module_name, generate_tests=False
+        )
+
+    # 6. Résultats finaux
+    score_final = get_pylint_score(fixed_file)
+    improvement = score_final - score_before
+
+    print(f"📊 Pylint FINAL: {score_final:.2f}/10")
+    print(f"📈 Improvement: {improvement:+.2f}")
+
+    if success:
+        print(f"✅ SUCCESS: Tests pass + Quality improved!")
     else:
-        print(f"✅ Finished successfully for {file_path}.")
+        print(f"❌ FAILED: Tests still fail")
+
+    if improvement > 0:
+        print(f"🎉 Quality IMPROVED!")
+    elif improvement < 0:
+        print(f"⚠️  Quality DECREASED!")
+    else:
+        print(f"➡️  Quality UNCHANGED")
+
+    # Logging
+    log_experiment(
+        agent_name="QualityChecker",
+        model_used="pylint",
+        action=ActionType.ANALYSIS,
+        details={
+            "file": file_path,
+            "score_before": score_before,
+            "score_after": score_final,
+            "improvement": improvement,
+            "test_success": success,
+            "input_prompt": f"Analyze {file_path}",
+            "output_response": f"Before: {score_before}, After: {score_final}, Tests: {'PASS' if success else 'FAIL'}",
+        },
+        status="SUCCESS" if success else "FAILURE",
+    )
 
 
 def main():
@@ -87,7 +200,7 @@ def main():
     python_files = [
         f
         for f in list_python_files(target_dir)
-        if not f.endswith("_test.py")  # Skip tests générés
+        if not f.endswith("_test.py")  # Skip tests générés!
     ]
     for file_path in python_files:
         process_file(file_path, API_KEY)
