@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Experiment Data Log Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "timestamp", "agent", "model", "action", "details", "status"],
+  "properties": {
+    "id": { "type": "string", "minLength": 8 },
+    "timestamp": { "type": "string", "minLength": 10 },
+    "agent": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "action": {
+      "type": "string",
+      "enum": ["DEBUG", "FIX", "CODE_ANALYSIS", "CODE_GEN"]
+    },
+    "details": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["input_prompt", "output_response"],
+      "properties": {
+        "input_prompt": { "type": "string" },
+        "output_response": { "type": "string" }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["SUCCESS", "FAILURE"]
+    }
+  }
+}
