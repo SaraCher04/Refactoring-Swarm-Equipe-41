@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 # Chemin du fichier de logs
@@ -11,10 +11,10 @@ class ActionType(str, Enum):
     """
     Énumération des types d'actions possibles pour standardiser l'analyse.
     """
-    ANALYSIS = "analysis"
-    GENERATION = "generation"
-    DEBUG = "debug"
-    FIX = "fix"
+    ANALYSIS = "CODE_ANALYSIS"   # ✅ fixed
+    GENERATION = "CODE_GEN"      # ✅ fixed
+    DEBUG = "DEBUG"              # ✅ already correct
+    FIX = "FIX"                  # ✅ already correct
 
 def log_experiment(agent_name: str, model_used: str, action: ActionType, details: dict, status: str):
     """
@@ -30,8 +30,12 @@ def log_experiment(agent_name: str, model_used: str, action: ActionType, details
     Raises:
         ValueError: Si les champs obligatoires sont manquants dans 'details' ou si l'action est invalide.
     """
-    
-    # --- 1. VALIDATION DU TYPE D'ACTION ---
+
+    # --- 1. VALIDATION STATUS ---
+    if status not in ("SUCCESS", "FAILURE"):
+        raise ValueError("❌ status doit être 'SUCCESS' ou 'FAILURE'.")
+
+    # --- 2. VALIDATION DU TYPE D'ACTION ---
     valid_actions = [a.value for a in ActionType]
 
     if isinstance(action, ActionType):
@@ -43,25 +47,25 @@ def log_experiment(agent_name: str, model_used: str, action: ActionType, details
             f"❌ Action invalide : '{action}'. Utilisez la classe ActionType (ex: ActionType.FIX)."
         )
 
-    # --- 2. VALIDATION STRICTE DES DONNÉES (Prompts) ---
-    # 🔧 FIX: comparaison string ↔ string (et non Enum)
-    if action_str in valid_actions:
-        required_keys = ["input_prompt", "output_response"]
-        missing_keys = [key for key in required_keys if key not in details]
-        
-        if missing_keys:
-            raise ValueError(
-                f"❌ Erreur de Logging (Agent: {agent_name}) : "
-                f"Les champs {missing_keys} sont manquants dans le dictionnaire 'details'. "
-                f"Ils sont OBLIGATOIRES pour valider le TP."
-            )
+    # --- 3. VALIDATION STRICTE DES DONNÉES ---
+    required_keys = ["input_prompt", "output_response"]
+    if not isinstance(details, dict):
+        raise ValueError("❌ 'details' doit être un dictionnaire (dict).")
 
-    # --- 3. PRÉPARATION DE L'ENTRÉE ---
+    missing_keys = [key for key in required_keys if key not in details]
+    if missing_keys:
+        raise ValueError(
+            f"❌ Erreur de Logging (Agent: {agent_name}) : "
+            f"Les champs {missing_keys} sont manquants dans le dictionnaire 'details'. "
+            f"Ils sont OBLIGATOIRES pour valider le TP."
+        )
+
+    # --- 4. PRÉPARATION DE L'ENTRÉE ---
     os.makedirs("logs", exist_ok=True)
-    
+
     entry = {
         "id": str(uuid.uuid4()),
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),  # ✅ timezone-aware
         "agent": agent_name,
         "model": model_used,
         "action": action_str,
@@ -69,7 +73,7 @@ def log_experiment(agent_name: str, model_used: str, action: ActionType, details
         "status": status
     }
 
-    # --- 4. ÉCRITURE ---
+    # --- 5. ÉCRITURE ---
     data = []
     if os.path.exists(LOG_FILE):
         try:
@@ -84,7 +88,10 @@ def log_experiment(agent_name: str, model_used: str, action: ActionType, details
             )
             data = []
 
+    if not isinstance(data, list):
+        data = []
+
     data.append(entry)
-    
+
     with open(LOG_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
