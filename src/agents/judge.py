@@ -43,7 +43,7 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
                 # Log successful generation
                 log_experiment(
                     agent_name="JudgeAgent",
-                    model_used="gemini-1.5-flash",
+                    model_used="gemini-2.5-flash",
                     action=ActionType.GENERATION,
                     details={
                         "input_prompt": input_prompt,
@@ -56,7 +56,7 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
                 # log failure response content
                 log_experiment(
                     agent_name="JudgeAgent",
-                    model_used="gemini-1.5-flash",
+                    model_used="gemini-2.5-flash",
                     action=ActionType.GENERATION,
                     details={
                         "input_prompt": input_prompt,
@@ -67,7 +67,7 @@ def generate_tests_for_code(code: str, api_key: str, module_name: str) -> str:
         except requests.exceptions.RequestException as e:
             log_experiment(
                 agent_name="JudgeAgent",
-                model_used="gemini-1.5-flash",
+                model_used="gemini-2.5-flash",
                 action=ActionType.DEBUG,
                 details={"input_prompt": input_prompt, "output_response": str(e)},
                 status="FAILURE",
@@ -102,7 +102,7 @@ def run_tests(
             feedback = "Failed to generate pytest tests.."
             log_experiment(
                 agent_name="JudgeAgent",
-                model_used="gemini-1.5-flash",
+                model_used="gemini-2.5-flash",
                 action=ActionType.DEBUG,
                 details={
                     "input_prompt": "Generate tests for code",

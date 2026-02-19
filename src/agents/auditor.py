@@ -33,7 +33,7 @@ def analyze_code(code_file: str, api_key: str) -> list:
         # Mandatory logging of prompt + response per teacher's instruction
         log_experiment(
             agent_name="AuditorAgent",
-            model_used="gemini-1.5-flash",
+            model_used="gemini-2.5-flash",
             action=ActionType.ANALYSIS,
             details={
                 "input_prompt": input_prompt,
@@ -60,7 +60,7 @@ def analyze_code(code_file: str, api_key: str) -> list:
 
     log_experiment(
         agent_name="AuditorAgent",
-        model_used="gemini-1.5-flash",
+        model_used="gemini-2.5-flash",
         action=ActionType.ANALYSIS,
         details={
             "input_prompt": input_prompt,

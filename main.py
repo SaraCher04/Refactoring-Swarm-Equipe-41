@@ -2,6 +2,7 @@
 import argparse
 import os
 from dotenv import load_dotenv
+
 from src.agents.auditor import analyze_code
 from src.agents.fixer import fix_code
 from src.agents.judge import run_tests
@@ -10,6 +11,7 @@ from src.utils.tool import validate_sandbox_path
 from src.utils.tool import list_python_files
 import subprocess
 import re
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -48,7 +50,6 @@ def process_file(file_path: str, api_key: str):
     """Process a single file through auditing, fixing, and testing with feedback loop."""
     print(f"🚀 Processing: {file_path}")
 
-    # SAUVEGARDER le code original
     from src.utils.tool import read_file, write_file
 
     original_code = read_file(file_path)
@@ -88,35 +89,32 @@ def process_file(file_path: str, api_key: str):
             print(f"❌ Existing tests FAIL")
             skip_test_generation = False
 
-    # 3. Auditor (toujours exécuté sauf si code optimal)
+    # 3. Auditor
     print(f"🔍 Running auditor...")
     issues = analyze_code(file_path, api_key)
 
     if not issues or issues == ["Gemini API error during analysis"]:
         print(f"ℹ️  No issues found by auditor")
 
-        # Si Pylint déjà bon ET tests passent → fin
         if score_before >= 8.0 and skip_test_generation:
             print(f"✅ Code already good enough")
             return
 
-        issues = ["Code could use minor improvements"]  # Forcer une petite amélioration
+        issues = ["Code could use minor improvements"]
 
     print(f"🔍 Auditor found {len(issues)} issues")
-    for i, issue in enumerate(issues[:3], 1):  # Afficher 3 premières issues
+    for i, issue in enumerate(issues[:3], 1):
         print(f"   {i}. {issue[:80]}...")
     if len(issues) > 3:
         print(f"   ... and {len(issues)-3} more")
 
-    # 4. Fixer (UNE SEULE FOIS d'abord)
+    # 4. Fixer
     print(f"🔧 Fixing issues...")
     fixed_file = fix_code(file_path, issues, api_key)
 
-    # Vérifier qualité après fixing
     score_after_fix = get_pylint_score(fixed_file)
     print(f"📊 Pylint AFTER fix: {score_after_fix:.2f}/10")
 
-    # Si qualité baisse BEAUCOUP, restaurer
     if score_after_fix < score_before - 1.0:
         print(f"⚠️  CRITICAL: Fixing DEGRADED quality significantly!")
         print(f"⚠️  Restoring original version...")
@@ -130,16 +128,12 @@ def process_file(file_path: str, api_key: str):
         fixed_file, api_key, module_name, generate_tests=not skip_test_generation
     )
 
-    # UNE seule tentative de re-fix si échec
     if not success and MAX_FIXER_RETRIES > 0:
         print(f"❌ Tests failed, trying ONE re-fix with feedback...")
-        # Limiter le feedback aux premières lignes
         short_feedback = "\n".join(feedback.split("\n")[:10])
         fixed_file = fix_code(
             fixed_file, issues, api_key, judge_feedback=short_feedback
         )
-
-        # Re-tester
         success, feedback = run_tests(
             fixed_file, api_key, module_name, generate_tests=False
         )
@@ -163,7 +157,6 @@ def process_file(file_path: str, api_key: str):
     else:
         print(f"➡️  Quality UNCHANGED")
 
-    # Logging
     log_experiment(
         agent_name="QualityChecker",
         model_used="pylint",
@@ -193,15 +186,15 @@ def main():
 
     target_dir = args.target_dir
 
-    # Validate the path
     validate_sandbox_path(target_dir)
 
-    # Process each Python file in the directory
+    # ✅ FIXED: skip both _test.py and test_*.py files
     python_files = [
         f
         for f in list_python_files(target_dir)
-        if not f.endswith("_test.py")  # Skip tests générés!
+        if not f.endswith("_test.py") and not os.path.basename(f).startswith("test_")
     ]
+
     for file_path in python_files:
         process_file(file_path, API_KEY)
 
